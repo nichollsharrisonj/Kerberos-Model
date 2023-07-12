@@ -1,0 +1,150 @@
+theory kerberos
+begin
+
+builtins: symmetric-encryption
+
+functions: 
+    NOW/0
+
+rule Create_C:
+    [Fr(~KC)]
+    --[ Once($C), Role($C, 'C') ]->
+    [!LtkC($C, ~KC)]
+
+rule Corrupt_C:
+    [!LtkC($C,~KC)]
+    --[CorruptC($C,~KC)]->
+    [Out(~KC)]
+
+rule Create_S:
+    [Fr(~KS)]
+    --[ Once($S), Role($S, 'S') ]->
+    [!LtkS($S, ~KS)]
+
+rule Corrupt_S:
+    [!LtkS($S,~KS)]
+    --[CorruptS($S,~KS)]->
+    [Out(~KS)]
+
+rule Create_KAS:
+    [Fr(~KCS), !LtkC($C,~KC),!LtkS($S,~KS)]
+    --[Once($KAS), Role($KAS, 'KAS'),KCSestablished($C,$S,~KCS)]->
+    [First($KAS, ~KCS)]
+
+rule Reveal_Session:
+    [First($KAS,~KCS)]
+    --[Reveal($KAS,~KCS)]->
+    [Out(~KCS)]
+
+rule Client_Hello:
+    [Fr(~nC),!LtkC($C,~KC)]
+    --[ClientHello(~nC)]->
+    [Out(<$C,$S,~nC>)]
+
+
+rule KAS_Response:
+    let
+        tKAS = NOW()
+        // c1 = senc(<~KCS,~nC,tKAS,$S>,~KC)
+        c1 = senc{~KCS,~nC,tKAS,$S}~KC
+        // c2 = senc(<~KCS,$C>,~KS)
+        c2 = senc{~KCS,tKAS,$C}~KS
+    in
+
+    [First($KAS,~KCS),Fr(~KCS),In(<$C,$S,~nC>),!LtkC($C,~KC),!LtkS($S,~KS)]
+        --[KASNonce(~KCS)]->
+    [Out(<c1>),Out(<c2>)]
+
+
+rule Client_Forward:
+    let 
+        m1 = sdec(senc{~KCS,~nC,tKAS,$S}~KC,~KC)
+        tC = NOW()
+        c2 = senc{~KCS,tKAS,$C}~KS
+        c3 = senc{$C,tC,~KCSprime}~KCS
+    in
+    [In(senc{~KCS,~nC,tKAS,$S}~KC),In(senc{~KCS,tKAS,$C}~KS), !LtkC($C,~KC),Fr(~KCSprime)]
+        --[Client_receive(~KCS)]->
+    // [Message(m,~nC),Out(<>),Out(<c2>)]
+    [Out(<c2>),Out(<c3>),Second($KAS,~KCSprime)]
+
+rule Server_Response:
+    let 
+        m2 = sdec(senc{~KCS,tKAS,$C}~KS,~KS)
+        m3 = sdec(senc{$Cprime,tC,~KCSprime}~KCS,~KCS) //Cprime to allow checking C == C'
+        now = NOW()
+        c4 = senc{tC}~KCS
+    in
+    [In(<senc{~KCS,tKAS,$C}~KS>),In(<senc{$Cprime,tC,~KCSprime}~KCS>),!LtkS($S,~KS)]
+    --[Serv(m2,m3),Time(now,tC,tKAS),Client_ids($C,$Cprime),ServAccept($C,$S,~KCSprime)]-> //maybe check timeok? Use extra lemma.
+    [Out(<c4>)]
+
+rule Client_Final:
+    let
+        tC = NOW()
+        m4 = sdec(senc{tCprime}~KCS,~KCS)
+    in
+    [In(<senc{tCprime}~KCS>),!LtkC($C,~KC),Second($KAS,~KCSprime)] 
+        --[ClientTime(tCprime,tC),Clientaccept($C,$S,~KCSprime)]->
+    []
+
+
+
+
+// include(lemmas/empty.spthy)
+
+
+// restriction TimesOK:
+// "
+//     //Check that tCs match between flows
+// "
+
+lemma KCsecret:
+"
+    All C KC S KS.
+        not (Ex #k #l . CorruptC(C,KC) @ #k | CorruptS(S,KS) @ #l)
+        ==> (
+            not Ex #i #j KCS.
+            KCSestablished(C,S,KCS) @ #i &
+            K(KCS) @ #j 
+        )
+"
+
+
+
+
+lemma authentication:
+"
+    All C KC S KS.
+        not (Ex #k #l . CorruptC(C,KC) @ #k | CorruptS(S,KS) @ #l)
+        ==> (
+            All C S KCSprime#i #j .
+            Clientaccept(C,S,KCSprime) @ #i &
+            ServAccept(C,S,KCSprime) @ #j &
+            #i < #j
+        )
+        
+        //If Client_Final happens, client thinks they are talking to the server. Want clientaccept(c) ==> server response happened with the same C
+"
+
+
+
+end
+
+lemma keyagreement: //liveness?
+"
+    not Ex #i #j.
+    K
+"
+
+// KEMTLS authentication lemma
+// lemma entity_authentication [use_induction]:
+//   "All tid actor peer nonces cas #i.
+//     commit(Nonces, actor, ’client’, nonces)@i &
+//     commit(Identity, actor, ’client’, peer, <cas, ’auth’>)@i &
+//     not (Ex #r. RevLtk(peer)@r & #r < #i)
+//     ==> (
+//       Ex tid2 #j_ea.
+//         running2(Nonces, peer, ’server’, nonces)@j_ea
+//         & #j_ea < #i
+// )"

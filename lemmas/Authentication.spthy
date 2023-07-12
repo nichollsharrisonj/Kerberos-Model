@@ -1,0 +1,7 @@
+lemma Authentication:
+"
+    All C KC S KS.
+        not (Ex #k #l . CorruptC(C,KC) @ #k | CorruptS(S,KS) @ #l)
+        
+    
+"

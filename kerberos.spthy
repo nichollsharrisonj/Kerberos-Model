@@ -1,0 +1,15 @@
+changequote(<!,!>)
+
+theory kerberos
+begin
+
+include(protocol/primitives.spthy)
+
+include(protocol/rules.spthy)
+
+include(lemmas/KCsecret.spthy)
+
+include(lemmas/)
+
+
+end

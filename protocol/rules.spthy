@@ -1,0 +1,66 @@
+rule Create_C:
+    [Fr(~KC)]
+    --[ Once($C), Role($C, 'C') ]->
+    [!LtkC($C, ~KC)]
+
+rule Create_S:
+    [Fr(~KS)]
+    --[ Once($S), Role($S, 'S') ]->
+    [!LtkS($S, ~KS)]
+
+rule Create_KAS:
+    [Fr(~KCS), !LtkC($C,~KC),!LtkS($S,~KS)]
+    --[Once($KAS), Role($KAS, 'KAS'),KCSestablished(~KCS)]->
+    [First($KAS, ~KCS)]
+
+
+rule Client_Hello:
+    [Fr(~nC),!LtkC($C,~KC)]
+    --[ClientHello()]->
+    [Out(<$C,$S,~nC>)]
+
+
+rule KAS_Response:
+    let
+        tKAS = NOW()
+        // c1 = senc(<~KCS,~nC,tKAS,$S>,~KC)
+        c1 = senc{~KCS,~nC,tKAS,$S}~KC
+        // c2 = senc(<~KCS,$C>,~KS)
+        c2 = senc{~KCS,tKAS,$C}~KS
+    in
+
+    [First($KAS,~KCS),Fr(~KCS),In(<$C,$S,~nC>),!LtkC($C,~KC),!LtkS($S,~KS)]
+        --[KASNonce(~KCS)]->
+    [Out(<c1>),Out(<c2>)]
+
+
+rule Client_Forward:
+    let 
+        m1 = sdec(senc{~KCS,~nC,tKAS,$S}~KC,~KC)
+        tC = NOW()
+        c2 = senc{~KCS,tKAS,$C}~KS
+        c3 = senc{C,tC}~KCS
+    in
+    [In(senc{~KCS,~nC,tKAS,$S}~KC),In(senc{~KCS,tKAS,$C}~KS), !LtkC($C,~KC)]
+        --[Client_receive(~KCS)]->
+    // [Message(m,~nC),Out(<>),Out(<c2>)]
+    [Out(<c2>),Out(<c3>)]
+
+rule Server_Response:
+    let 
+        m2 = sdec(senc{~KCS,tKAS,$C}~KS,~KS)
+        m3 = sdec(senc{Cprime,tC}~KCS,~KCS) //Cprime to allow checking C == C'
+        now = NOW()
+        c4 = senc{tC}~KCS
+    in
+    [In(<senc{~KCS,tKAS,$C}~KS>),In(<senc{Cprime,tC}~KCS>),!LtkS($S,~KS)]
+    --[Serv(m2,m3),Time(now,tC,tKAS)]-> //maybe check timeok? Use extra lemma.
+    [Out(<c4>)]
+
+rule Client_Final:
+    let
+        tC = NOW()
+    in
+    [In(<senc{tCprime}~KCS>),!LtkC($C,~KC)]
+        --[ClientTime(tCprime,tC)]->
+    []

@@ -1,0 +1,14 @@
+lemma kcsecret:
+exists-trace
+"
+    Ex #i #j.
+    KCSestablished(KCS) @ i &
+    K(KCS) @ #j
+"
+end
+
+lemma keyagreement:
+"
+    not Ex #i #j.
+    K
+"
