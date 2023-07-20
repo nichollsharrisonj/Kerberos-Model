@@ -1,0 +1,17 @@
+//----- Oracles -----
+
+rule Corrupt_C:
+    [!LtkC($C,~KC)]
+    --[CorruptC($C,~KC)]->
+    [Out(~KC)]
+
+rule Corrupt_S:
+    [!LtkS($S,~KS)]
+    --[CorruptS($S,~KS)]->
+    [Out(~KS)]
+
+rule Reveal_Session:
+    [First($KAS,~KCS)]
+    --[Reveal($KAS,~KCS)]->
+    [Out(~KCS)]
+
