@@ -1,0 +1,74 @@
+// ---------- Client ----------
+
+rule Client_Action_0:
+    let
+        cid_0 = <'None'>
+        sid_0 = <'None'>
+        m = <$C,$S,~nC>
+
+    in
+    [
+        !LtkC($C,~KC),
+        Fr(~nC),
+        Fr(~tid)
+    ]
+    --[
+        Role(~tid,'client'),
+        ClientHello(m),
+        CID(~tid, '0', cid_0),
+        SID(~tid, '0', sid_0)
+    ]->
+    [
+        Out(m),
+        State(~tid, 'ClientAction0')
+    ]
+
+rule Client_Action_1:
+    let 
+        tC = NOW()
+        c1 = senc{~KCS,~nC,tKAS,$S}~KC
+        m1 = sdec(c1,~KC)
+        c3 = senc{$C,tC,~KCSprime}~KCS
+        cid_1 = <c1>
+        sid_1 = <c3>
+    in
+    [
+        In(c1),
+        In(c2),
+        !LtkC($C,~KC),
+        Fr(~KCSprime), //Session Key
+        State(tid, 'ClientAction0')
+    ]
+    --[
+        Client_receive($C,~KCS),
+        CID(tid,'1',cid_1),
+        SID(tid,'1',sid_1)
+    ]->
+    [
+        Out(<c2>),
+        Out(<c3>),
+        Second($KAS,~KCSprime),
+        State(tid, 'ClientAction0'),
+        SID(tid,'1',sid_1)
+    ]
+//big problem.
+
+rule Client_Action_2:
+    let
+        tC = NOW()
+        c4 = <senc{tCprime}~KCS>
+        m4 = sdec(c4,~KCS)
+        sid_2 = <sid_1,c4>
+    in
+    [
+        In(c4),
+        !LtkC($C,~KC),
+        Second($KAS,~KCSprime),
+        State(tid, 'ClientAction0'),
+        SID(tid,'1',Sid_1)
+    ]
+    --[
+        ClientTime(tCprime,tC),
+        Clientaccept($C,$S,~KCSprime)
+    ]->
+    []

@@ -6,99 +6,166 @@ builtins: symmetric-encryption
 functions: 
     NOW/0
 
+// ----- Keygen -----
+
 rule Create_C:
     [Fr(~KC)]
     --[ Once($C), Role($C, 'C') ]->
     [!LtkC($C, ~KC)]
-
-rule Corrupt_C:
-    [!LtkC($C,~KC)]
-    --[CorruptC($C,~KC)]->
-    [Out(~KC)]
 
 rule Create_S:
     [Fr(~KS)]
     --[ Once($S), Role($S, 'S') ]->
     [!LtkS($S, ~KS)]
 
-rule Corrupt_S:
-    [!LtkS($S,~KS)]
-    --[CorruptS($S,~KS)]->
-    [Out(~KS)]
-
 rule Create_KAS:
     [Fr(~KCS), !LtkC($C,~KC),!LtkS($S,~KS)]
     --[Once($KAS), Role($KAS, 'KAS'),KCSestablished($C,$S,~KCS)]->
     [First($KAS, ~KCS)]
 
-rule Reveal_Session:
-    [First($KAS,~KCS)]
-    --[Reveal($KAS,~KCS)]->
-    [Out(~KCS)]
+// ----- Party Actions-----
 
-rule Client_Hello:
-    [Fr(~nC),!LtkC($C,~KC)]
-    --[ClientHello(~nC)]->
-    [Out(<$C,$S,~nC>)]
+// ---------- Client ----------
 
-
-rule KAS_Response:
+rule Client_Action_0:
     let
-        tKAS = NOW()
-        // c1 = senc(<~KCS,~nC,tKAS,$S>,~KC)
-        c1 = senc{~KCS,~nC,tKAS,$S}~KC
-        // c2 = senc(<~KCS,$C>,~KS)
-        c2 = senc{~KCS,tKAS,$C}~KS
+        cid_0 = <'None'>
+        sid_0 = <'None'>
+        m = <$C,$S,~nC>
+
     in
+    [
+        !LtkC($C,~KC),
+        Fr(~nC),
+        Fr(~tid)
+    ]
+    --[
+        Role(~tid,'client'),
+        ClientHello(m),
+        CID(~tid, '0', cid_0),
+        SID(~tid, '0', sid_0)
+    ]->
+    [
+        Out(m),
+        State(~tid, 'ClientAction0')
+    ]
 
-    [First($KAS,~KCS),Fr(~KCS),In(<$C,$S,~nC>),!LtkC($C,~KC),!LtkS($S,~KS)]
-        --[KASNonce(~KCS)]->
-    [Out(<c1>),Out(<c2>)]
-
-
-rule Client_Forward:
+rule Client_Action_1:
     let 
-        m1 = sdec(senc{~KCS,~nC,tKAS,$S}~KC,~KC)
         tC = NOW()
-        c2 = senc{~KCS,tKAS,$C}~KS
+        c1 = senc{~KCS,~nC,tKAS,$S}~KC
+        m1 = sdec(c1,~KC)
         c3 = senc{$C,tC,~KCSprime}~KCS
+        cid_1 = <c1>
+        sid_1 = <c3>
     in
-    [In(senc{~KCS,~nC,tKAS,$S}~KC),In(senc{~KCS,tKAS,$C}~KS), !LtkC($C,~KC),Fr(~KCSprime)]
-        --[Client_receive(~KCS)]->
-    // [Message(m,~nC),Out(<>),Out(<c2>)]
-    [Out(<c2>),Out(<c3>),Second($KAS,~KCSprime)]
+    [
+        In(c1),
+        In(c2),
+        !LtkC($C,~KC),
+        Fr(~KCSprime), //Session Key
+        State(tid, 'ClientAction0')
+    ]
+    --[
+        Client_receive($C,~KCS),
+        CID(tid,'1',cid_1),
+        SID(tid,'1',sid_1)
+    ]->
+    [
+        Out(<c2>),
+        Out(<c3>),
+        Second($KAS,~KCSprime),
+        State(tid, 'ClientAction0'),
+        SID(tid,'1',sid_1)
+    ]
+//big problem.
 
-rule Server_Response:
+rule Client_Action_2:
+    let
+        tC = NOW()
+        c4 = <senc{tCprime}~KCS>
+        m4 = sdec(c4,~KCS)
+        sid_2 = <sid_1,c4>
+    in
+    [
+        In(c4),
+        !LtkC($C,~KC),
+        Second($KAS,~KCSprime),
+        State(tid, 'ClientAction0'),
+        SID(tid,'1',Sid_1)
+    ]
+    --[
+        ClientTime(tCprime,tC),
+        clientAccept($C,$S,~KCSprime)
+    ]->
+    []
+
+// ---------- AS -------------
+
+rule AS_Action:
+let
+    tKAS = NOW()
+    c1 = senc{~KCS,~nC,tKAS,$S}~KC
+    c2 = senc{~KCS,tKAS,$C}~KS
+    m = <$C,$S,~nC>
+    cid_1 = <$C,$S,c1,c2>
+    //No sid?
+in
+[
+    First($KAS,~KCS),
+    In(m),
+    !LtkC($C,~KC),
+    !LtkS($S,~KS),
+    Fr(~tid)
+]
+--[
+    KASNonce(~KCS),
+    CID(~tid, '2', cid_1)
+]->
+[
+    Out(<c1>),
+    Out(<c2>) 
+    //AS does not need a state because it has only one action.
+]
+
+// ---------- Server ----------
+
+rule Server_Action:
     let 
         m2 = sdec(senc{~KCS,tKAS,$C}~KS,~KS)
         m3 = sdec(senc{$Cprime,tC,~KCSprime}~KCS,~KCS) //Cprime to allow checking C == C'
         now = NOW()
         c4 = senc{tC}~KCS
     in
-    [In(<senc{~KCS,tKAS,$C}~KS>),In(<senc{$Cprime,tC,~KCSprime}~KCS>),!LtkS($S,~KS)]
-    --[Serv(m2,m3),Time(now,tC,tKAS),Client_ids($C,$Cprime),ServAccept($C,$S,~KCSprime)]-> //maybe check timeok? Use extra lemma.
+    [
+        In(<senc{~KCS,tKAS,$C}~KS>),
+        In(<senc{$Cprime,tC,~KCSprime}~KCS>),
+        !LtkS($S,~KS)]
+    --[
+        Serv(m2,m3),
+        Time(now,tC,tKAS),
+        Client_ids($C,$Cprime),
+        ServAccept($C,$S,~KCSprime)]-> //maybe check timeok? Use extra lemma.
     [Out(<c4>)]
 
-rule Client_Final:
-    let
-        tC = NOW()
-        m4 = sdec(senc{tCprime}~KCS,~KCS)
-    in
-    [In(<senc{tCprime}~KCS>),!LtkC($C,~KC),Second($KAS,~KCSprime)] 
-        --[ClientTime(tCprime,tC),Clientaccept($C,$S,~KCSprime)]->
-    []
+//----- Oracles -----
 
+rule Corrupt_C:
+    [!LtkC($C,~KC)]
+    --[CorruptC($C,~KC)]->
+    [Out(~KC)]
 
+rule Corrupt_S:
+    [!LtkS($S,~KS)]
+    --[CorruptS($S,~KS)]->
+    [Out(~KS)]
 
+rule Reveal_Session:
+    [First($KAS,~KCS)]
+    --[Reveal($KAS,~KCS)]->
+    [Out(~KCS)]
 
-// include(lemmas/empty.spthy)
-
-
-// restriction TimesOK:
-// "
-//     //Check that tCs match between flows
-// "
-
+// ----- Lemmas -----
 lemma KCsecret:
 "
     All C KC S KS.
@@ -110,32 +177,27 @@ lemma KCsecret:
         )
 "
 
-
-
-
 lemma authentication:
 "
     All C KC S KS.
         not (Ex #k #l . CorruptC(C,KC) @ #k | CorruptS(S,KS) @ #l)
         ==> (
-            All C S KCSprime#i #j .
-            Clientaccept(C,S,KCSprime) @ #i &
+            All C S KCSprime #i #j .
+            clientAccept(C,S,KCSprime) @ #i &
             ServAccept(C,S,KCSprime) @ #j &
             #i < #j
         )
-        
-        //If Client_Final happens, client thinks they are talking to the server. Want clientaccept(c) ==> server response happened with the same C
+
+//If Client_2 happens, client thinks they are talking to the server. Want clientAccept(c) ==> server response happened with the same C
 "
-
-
 
 end
 
-lemma keyagreement: //liveness?
-"
-    not Ex #i #j.
-    K
-"
+// lemma keyagreement: //liveness?
+// "
+//     not Ex #i #j.
+//     K
+// "
 
 // KEMTLS authentication lemma
 // lemma entity_authentication [use_induction]:

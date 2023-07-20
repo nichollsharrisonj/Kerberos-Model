@@ -1,7 +1,11 @@
-lemma Authentication:
+lemma authentication:
 "
     All C KC S KS.
         not (Ex #k #l . CorruptC(C,KC) @ #k | CorruptS(S,KS) @ #l)
-        
-    
+        ==> (
+            All C S KCSprime#i #j .
+            Clientaccept(C,S,KCSprime) @ #i &
+            ServAccept(C,S,KCSprime) @ #j &
+            #i < #j
+        )
 "

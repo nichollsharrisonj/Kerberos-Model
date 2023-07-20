@@ -4,12 +4,13 @@ theory kerberos
 begin
 
 include(protocol/primitives.spthy)
-
-include(protocol/rules.spthy)
+include(protocol/kerberos_keygen.spthy)
+include(protocol/kerberos_client.spthy)
+include(protocol/kerberos_as.spthy)
+include(protocol/kerberos_server.spthy)
+include(model/oracles.spthy)
 
 include(lemmas/KCsecret.spthy)
-
-include(lemmas/)
-
+include(lemmas/Authentication.spthy)
 
 end

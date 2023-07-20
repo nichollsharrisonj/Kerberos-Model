@@ -1,0 +1,27 @@
+// ---------- AS -------------
+
+rule AS_Action:
+let
+    tKAS = NOW()
+    c1 = senc{~KCS,~nC,tKAS,$S}~KC
+    c2 = senc{~KCS,tKAS,$C}~KS
+    m = <$C,$S,~nC>
+    cid_1 = <$C,$S,c1,c2>
+    //No sid?
+in
+[
+    First($KAS,~KCS),
+    In(m),
+    !LtkC($C,~KC),
+    !LtkS($S,~KS),
+    Fr(~tid)
+]
+--[
+    KASNonce(~KCS),
+    CID(~tid, '2', cid_1)
+]->
+[
+    Out(<c1>),
+    Out(<c2>) 
+    //AS does not need a state because it has only one action.
+]

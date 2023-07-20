@@ -1,0 +1,19 @@
+// ---------- Server ----------
+
+rule Server_Action:
+    let 
+        m2 = sdec(senc{~KCS,tKAS,$C}~KS,~KS)
+        m3 = sdec(senc{$Cprime,tC,~KCSprime}~KCS,~KCS) //Cprime to allow checking C == C'
+        now = NOW()
+        c4 = senc{tC}~KCS
+    in
+    [
+        In(<senc{~KCS,tKAS,$C}~KS>),
+        In(<senc{$Cprime,tC,~KCSprime}~KCS>),
+        !LtkS($S,~KS)]
+    --[
+        Serv(m2,m3),
+        Time(now,tC,tKAS),
+        Client_ids($C,$Cprime),
+        ServAccept($C,$S,~KCSprime)]-> //maybe check timeok? Use extra lemma.
+    [Out(<c4>)]

@@ -1,0 +1,16 @@
+// ----- Keygen -----
+
+rule Create_C:
+    [Fr(~KC)]
+    --[ Once($C), Role($C, 'C') ]->
+    [!LtkC($C, ~KC)]
+
+rule Create_S:
+    [Fr(~KS)]
+    --[ Once($S), Role($S, 'S') ]->
+    [!LtkS($S, ~KS)]
+
+rule Create_KAS:
+    [Fr(~KCS), !LtkC($C,~KC),!LtkS($S,~KS)]
+    --[Once($KAS), Role($KAS, 'KAS'),KCSestablished($C,$S,~KCS)]->
+    [First($KAS, ~KCS)]
