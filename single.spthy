@@ -145,8 +145,12 @@ rule Server_Action:
         Serv(m2,m3),
         Time(now,tC,tKAS),
         Client_ids($C,$Cprime),
-        ServAccept($C,$S,~KCSprime)]-> //maybe check timeok? Use extra lemma.
-    [Out(<c4>)]
+        ServAccept($C,$S,~KCSprime)]
+        -> //maybe check timeok? Use extra lemma.
+    [
+        Out(<c4>)
+        //AS does not need a state because it has only one action.
+    ]
 
 //----- Oracles -----
 
